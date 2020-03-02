@@ -490,15 +490,17 @@ static inline int ip_vs_tunnel_xmit_prepare(struct sk_buff *skb,
 }
 
 /* return NF_STOLEN (sent) or NF_ACCEPT if local=1 (not sent) */
+// @xnile 发送包
 static inline int ip_vs_nat_send_or_cont(int pf, struct sk_buff *skb,
 					 struct ip_vs_conn *cp, int local)
 {
-	int ret = NF_STOLEN;
+	int ret = NF_STOLEN; /* @xnile TODO */
 
 	skb->ipvs_property = 1;
 	if (likely(!(cp->flags & IP_VS_CONN_F_NFCT)))
 		ip_vs_notrack(skb);
 	else
+		// @xnile 更新conntrack表
 		ip_vs_update_conntrack(skb, cp, 1);
 	if (!local) {
 		skb_forward_csum(skb);
@@ -685,6 +687,7 @@ ip_vs_nat_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->ignore_df = 1;
 
+	// @xnile
 	rc = ip_vs_nat_send_or_cont(NFPROTO_IPV4, skb, cp, local);
 	rcu_read_unlock();
 

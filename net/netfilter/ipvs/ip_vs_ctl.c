@@ -891,6 +891,7 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest,
 	INIT_HLIST_NODE(&dest->d_list);
 	spin_lock_init(&dest->dst_lock);
 	spin_lock_init(&dest->stats.lock);
+	// @xnile 更新
 	__ip_vs_update_dest(svc, dest, udest, 1);
 
 	*dest_p = dest;
@@ -955,6 +956,7 @@ ip_vs_add_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 			      IP_VS_DBG_ADDR(svc->af, &dest->vaddr),
 			      ntohs(dest->vport));
 
+		// @xnile 更新
 		__ip_vs_update_dest(svc, dest, udest, 1);
 		ret = 0;
 	} else {
@@ -3881,6 +3883,7 @@ int __init ip_vs_register_nl_ioctl(void)
 {
 	int ret;
 
+	// @xnile 注册接口，供用户态使用
 	ret = nf_register_sockopt(&ip_vs_sockopts);
 	if (ret) {
 		pr_err("cannot register sockopt.\n");

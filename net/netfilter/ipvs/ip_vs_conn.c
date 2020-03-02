@@ -480,9 +480,11 @@ void ip_vs_conn_fill_cport(struct ip_vs_conn *cp, __be16 cport)
  *	Bind a connection entry with the corresponding packet_xmit.
  *	Called by ip_vs_conn_new.
  */
+// @xnile 发送回调函数
 static inline void ip_vs_bind_xmit(struct ip_vs_conn *cp)
 {
 	switch (IP_VS_FWD_METHOD(cp)) {
+	//@xnile NAT模式
 	case IP_VS_CONN_F_MASQ:
 		cp->packet_xmit = ip_vs_nat_xmit;
 		break;
@@ -543,6 +545,7 @@ static inline int ip_vs_dest_totalconns(struct ip_vs_dest *dest)
  *	Bind a connection entry with a virtual service destination
  *	Called just after a new connection entry is created.
  */
+// @xnile 将connection同后端service绑定
 static inline void
 ip_vs_bind_dest(struct ip_vs_conn *cp, struct ip_vs_dest *dest)
 {
@@ -556,10 +559,13 @@ ip_vs_bind_dest(struct ip_vs_conn *cp, struct ip_vs_dest *dest)
 	/* Increase the refcnt counter of the dest */
 	ip_vs_dest_hold(dest);
 
+	//@xnile ip_vs_dest对象的连接标志位.
+	//@xnile IP_VS_CONN_F_MASQ、 IP_VS_CONN_F_TUNNEL和IP_VS_CONN_F_DROUTE，分别代表NAT、TUN和DR三种模式。后两种模式也暗含了 IP_VS_CONN_F_NOOUTPUT标志位。
 	conn_flags = atomic_read(&dest->conn_flags);
 	if (cp->protocol != IPPROTO_UDP)
 		conn_flags &= ~IP_VS_CONN_F_ONE_PACKET;
 	flags = cp->flags;
+	// @xnile 关联发送回调函数
 	/* Bind with the destination and its corresponding transmitter */
 	if (flags & IP_VS_CONN_F_SYNC) {
 		/* if the connection is not template and is created
@@ -913,6 +919,7 @@ ip_vs_conn_new(const struct ip_vs_conn_param *p,
 		atomic_inc(&ip_vs_conn_no_cport_cnt);
 
 	/* Bind the connection with a destination server */
+	// @xnile 调用ip_vs_bind_dest
 	cp->dest = NULL;
 	ip_vs_bind_dest(cp, dest);
 
@@ -928,6 +935,7 @@ ip_vs_conn_new(const struct ip_vs_conn_param *p,
 		ip_vs_bind_xmit_v6(cp);
 	else
 #endif
+		//@xnile 绑定发送回调函数
 		ip_vs_bind_xmit(cp);
 
 	if (unlikely(pd && atomic_read(&pd->appcnt)))

@@ -71,6 +71,7 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops,
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn_nat *nat;
 	/* maniptype == SRC for postrouting. */
+	/* 获取是进行DNAT还是SNAT，其中PRE_ROUTING和LOCAL_OUT进行DNAT，LOCAL_IN和POST_ROUTING进行SNAT */
 	enum nf_nat_manip_type maniptype = HOOK2MANIP(ops->hooknum);
 
 	/* We never see fragments: conntrack defrags on pre-routing
@@ -78,12 +79,14 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops,
 	 */
 	NF_CT_ASSERT(!ip_is_fragment(ip_hdr(skb)));
 
+	/* 获取skb关联的连接跟踪sf_conn */
 	ct = nf_ct_get(skb, &ctinfo);
 	/* Can't track?  It's not due to stress, or conntrack would
 	 * have dropped it.  Hence it's the user's responsibilty to
 	 * packet filter it out, or implement conntrack/NAT for that
 	 * protocol. 8) --RR
 	 */
+	/* 没有，返回accpet */
 	if (!ct)
 		return NF_ACCEPT;
 
@@ -91,13 +94,17 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops,
 	if (nf_ct_is_untracked(ct))
 		return NF_ACCEPT;
 
+	/* 获取NAT扩展 */
 	nat = nf_ct_nat_ext_add(ct);
 	if (nat == NULL)
 		return NF_ACCEPT;
 
+	/* 判断连接跟踪状态 */
 	switch (ctinfo) {
+	/* 关联连接(或者icmp错误)或者关联连接的应答 */
 	case IP_CT_RELATED:
 	case IP_CT_RELATED_REPLY:
+		/* icmp协议的NAT操作 */
 		if (ip_hdr(skb)->protocol == IPPROTO_ICMP) {
 			if (!nf_nat_icmp_reply_translation(skb, ct, ctinfo,
 							   ops->hooknum))
@@ -110,16 +117,19 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops,
 		/* Seen it before?  This can happen for loopback, retrans,
 		 * or local packets.
 		 */
+		/* 尚未进行过NAT转换 */
 		if (!nf_nat_initialized(ct, maniptype)) {
 			unsigned int ret;
 
+			/* 查找规则 */
 			ret = nf_nat_rule_find(skb, ops->hooknum, in, out, ct);
 			if (ret != NF_ACCEPT)
 				return ret;
-		} else {
+		} else { /* 进行过NAT转换 */
 			pr_debug("Already setup manip %s for ct %p\n",
 				 maniptype == NF_NAT_MANIP_SRC ? "SRC" : "DST",
 				 ct);
+			/* 出接口发生改变 */
 			if (nf_nat_oif_changed(ops->hooknum, ctinfo, nat, out))
 				goto oif_changed;
 		}
@@ -133,6 +143,7 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops,
 			goto oif_changed;
 	}
 
+	/* skb数据包进行NAT转换修改 */
 	return nf_nat_packet(ct, ctinfo, ops->hooknum, skb);
 
 oif_changed:
@@ -148,9 +159,13 @@ nf_nat_ipv4_in(const struct nf_hook_ops *ops,
 	       int (*okfn)(struct sk_buff *))
 {
 	unsigned int ret;
+	/* 获取目的地址 */
 	__be32 daddr = ip_hdr(skb)->daddr;
 
+	/* DNAT转换 */
 	ret = nf_nat_ipv4_fn(ops, skb, in, out, okfn);
+
+	/* 转换之后，目的地址发生变化，释放路由缓存 */
 	if (ret != NF_DROP && ret != NF_STOLEN &&
 	    daddr != ip_hdr(skb)->daddr)
 		skb_dst_drop(skb);
@@ -215,13 +230,17 @@ nf_nat_ipv4_local_fn(const struct nf_hook_ops *ops,
 	    ip_hdrlen(skb) < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
+	/* DNAT转换 */
 	ret = nf_nat_ipv4_fn(ops, skb, in, out, okfn);
+	/* 转换成功 */
 	if (ret != NF_DROP && ret != NF_STOLEN &&
 	    (ct = nf_ct_get(skb, &ctinfo)) != NULL) {
 		enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 
+		/* ip地址发生变化 */
 		if (ct->tuplehash[dir].tuple.dst.u3.ip !=
 		    ct->tuplehash[!dir].tuple.src.u3.ip) {
+			/* 重新查路由 */
 			err = ip_route_me_harder(skb, RTN_UNSPEC);
 			if (err < 0)
 				ret = NF_DROP_ERR(err);
@@ -242,6 +261,7 @@ nf_nat_ipv4_local_fn(const struct nf_hook_ops *ops,
 
 static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
 	/* Before packet filtering, change destination */
+	// @xnile  iptables -t nat -A REROUTING
 	{
 		.hook		= nf_nat_ipv4_in,
 		.owner		= THIS_MODULE,
@@ -250,6 +270,7 @@ static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
 		.priority	= NF_IP_PRI_NAT_DST,
 	},
 	/* After packet filtering, change source */
+	// @xnile iptables -t nat -A POSTROUTING
 	{
 		.hook		= nf_nat_ipv4_out,
 		.owner		= THIS_MODULE,
@@ -258,6 +279,8 @@ static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
 		.priority	= NF_IP_PRI_NAT_SRC,
 	},
 	/* Before packet filtering, change destination */
+	// @xnile iptables -t nat -A OUTPUT
+	// @ DNAT 本机出去的包
 	{
 		.hook		= nf_nat_ipv4_local_fn,
 		.owner		= THIS_MODULE,
@@ -266,6 +289,7 @@ static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
 		.priority	= NF_IP_PRI_NAT_DST,
 	},
 	/* After packet filtering, change source */
+	// @SNAT 
 	{
 		.hook		= nf_nat_ipv4_fn,
 		.owner		= THIS_MODULE,

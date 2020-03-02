@@ -292,6 +292,14 @@ nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, u_int8_t family)
 }
 
 #else /* !CONFIG_NETFILTER */
+/*
+pf：协议族名，netfilter架构同样可以用于IP层之外，因此这个变量还可以有诸如PF_INET6，PF_DECnet等名字。
+hook：HOOK点的名字，对于IP层，就是取上面的五个值；
+skb：顾名思义
+indev：进来的设备，以struct net_device结构表示；
+outdev：出去的设备，以struct net_device结构表示；
+okfn:是个函数指针，当所有的该HOOK点的所有登记函数调用完后，转而走此流程。
+*/
 #define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
 #define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond) (okfn)(skb)
 static inline int nf_hook_thresh(u_int8_t pf, unsigned int hook,

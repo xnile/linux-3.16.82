@@ -1723,6 +1723,7 @@ ip_vs_in(unsigned int hooknum, struct sk_buff *skb, int af)
 	ip_vs_in_stats(cp, skb);
 	ip_vs_set_state(cp, IP_VS_DIR_INPUT, skb, pd);
 	if (cp->packet_xmit)
+		// @xnile 发送包
 		ret = cp->packet_xmit(skb, cp, pp, &iph);
 		/* do not touch skb anymore */
 	else {
@@ -1864,6 +1865,7 @@ ip_vs_forward_icmp_v6(const struct nf_hook_ops *ops, struct sk_buff *skb,
 
 static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After packet filtering, change source only for VS/NAT */
+	// @xnile RIP->DIP修改为VIP->DIP,用于本机请求VIP后的回包
 	{
 		.hook		= ip_vs_reply4,
 		.owner		= THIS_MODULE,
@@ -1874,6 +1876,7 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After packet filtering, forward packet through VS/DR, VS/TUN,
 	 * or VS/NAT(change destination), so that filtering rules can be
 	 * applied to IPVS. */
+	// @xnile CIP->VIP修改为CIP->RIP
 	{
 		.hook		= ip_vs_remote_request4,
 		.owner		= THIS_MODULE,
@@ -1882,6 +1885,8 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 		.priority	= NF_IP_PRI_NAT_SRC - 1,
 	},
 	/* Before ip_vs_in, change source only for VS/NAT */
+	// @xnile  NF_INET_LOCAL_OUT 本机应用层发出去的包
+	// @xnile  DIP->DIP 修改为DIR->VIP
 	{
 		.hook		= ip_vs_local_reply4,
 		.owner		= THIS_MODULE,
@@ -1890,6 +1895,8 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 		.priority	= NF_IP_PRI_NAT_DST + 1,
 	},
 	/* After mangle, schedule and forward local requests */
+	// @xnile  NF_INET_LOCAL_OUT 本机应用层发出去的包
+	// @xnile DIP->VIP修改为DIP->RIP
 	{
 		.hook		= ip_vs_local_request4,
 		.owner		= THIS_MODULE,
@@ -1907,6 +1914,7 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 		.priority	= 99,
 	},
 	/* After packet filtering, change source only for VS/NAT */
+	//@xnile RIP->CIP to src为VIP
 	{
 		.hook		= ip_vs_reply4,
 		.owner		= THIS_MODULE,
@@ -2062,6 +2070,7 @@ static struct pernet_operations ipvs_core_dev_ops = {
 /*
  *	Initialize IP Virtual Server
  */
+// @xnile 初始化
 static int __init ip_vs_init(void)
 {
 	int ret;
@@ -2094,6 +2103,7 @@ static int __init ip_vs_init(void)
 		goto cleanup_dev;
 	}
 
+	// @xnile 用户态的接口
 	ret = ip_vs_register_nl_ioctl();
 	if (ret < 0) {
 		pr_err("can't register netlink/ioctl.\n");

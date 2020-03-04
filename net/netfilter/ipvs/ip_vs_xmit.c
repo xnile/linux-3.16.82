@@ -504,6 +504,7 @@ static inline int ip_vs_nat_send_or_cont(int pf, struct sk_buff *skb,
 		ip_vs_update_conntrack(skb, cp, 1);
 	if (!local) {
 		skb_forward_csum(skb);
+		// @xnile 走到OUTPUT
 		NF_HOOK(pf, NF_INET_LOCAL_OUT, skb, NULL, skb_dst(skb)->dev,
 			dst_output);
 	} else

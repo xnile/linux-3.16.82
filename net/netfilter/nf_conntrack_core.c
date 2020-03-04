@@ -628,6 +628,7 @@ void nf_conntrack_tmpl_insert(struct net *net, struct nf_conn *tmpl)
 EXPORT_SYMBOL_GPL(nf_conntrack_tmpl_insert);
 
 /* Confirm a connection given skb; places it in hash table */
+// @xnile 在此完成确认confirm，然后才会加入到conntrack哈希
 int
 __nf_conntrack_confirm(struct sk_buff *skb)
 {

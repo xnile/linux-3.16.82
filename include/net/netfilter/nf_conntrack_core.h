@@ -58,6 +58,7 @@ nf_conntrack_find_get(struct net *net, u16 zone,
 int __nf_conntrack_confirm(struct sk_buff *skb);
 
 /* Confirm a connection: returns NF_DROP if packet must be dropped. */
+// @xnile DO
 static inline int nf_conntrack_confirm(struct sk_buff *skb)
 {
 	struct nf_conn *ct = (struct nf_conn *)skb->nfct;
